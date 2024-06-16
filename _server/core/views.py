@@ -4,14 +4,15 @@ import json
 import os
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
+from django.forms.models import model_to_dict
 
 from .models import Todo_Item
 
-# # Load manifest when server launches
-# MANIFEST = {}
-# if not settings.DEBUG:
-#     f = open(f"{settings.BASE_DIR}/core/static/manifest.json")
-#     MANIFEST = json.load(f)
+# Load manifest when server launches
+MANIFEST = {}
+if not settings.DEBUG:
+    f = open(f"{settings.BASE_DIR}/core/static/manifest.json")
+    MANIFEST = json.load(f)
 
 # Create your views here.
 @login_required
@@ -66,15 +67,29 @@ def get_todos(req):
     else:
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
-def update_todo(req, todo_id):
+@login_required
+def update_todo(req, todo_id): 
     try:
         todo = Todo_Item.objects.get(id=todo_id)
     except Todo_Item.DoesNotExist:
         return JsonResponse({"error": "Todo not found"}, status=404)
-    
-    todo_content = req.get('content')
+        
+    todo_content = req.POST.get('content')
     if todo_content is not None:
         todo.content = todo_content
+            
+    todo_due_date = req.POST.get('due_date')
+    if todo_due_date is not None:
+        todo.due_date = todo_due_date
         
-    todo_due_date = req.get('due_date')
-    
+    todo.save()
+        
+    return JsonResponse("Todo Updated", safe=False)
+
+@login_required
+def get_todo(req, todo_id):   
+    try:
+        todo = model_to_dict( Todo_Item.objects.get(id=todo_id) )
+    except Todo_Item.DoesNotExist:
+        return JsonResponse({"error": "Todo not found"}, status=404)
+    return JsonResponse({"Todo": todo})
