@@ -93,3 +93,11 @@ def get_todo(req, todo_id):
     except Todo_Item.DoesNotExist:
         return JsonResponse({"error": "Todo not found"}, status=404)
     return JsonResponse({"Todo": todo})
+
+def delete_todo(req, todo_id):
+    try:
+        todo = Todo_Item.objects.get(id=todo_id)
+    except Todo_Item.DoesNotExist:
+        return JsonResponse({"error": "Todo not found"}, status=404)
+    todo.delete()
+    return JsonResponse({"message": "Todo deleted"})
