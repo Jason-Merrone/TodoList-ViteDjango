@@ -43,33 +43,36 @@ def create_todo(req):
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
 @login_required
-def get_todos(req):
-    if req.method == 'GET':
-        todos = Todo_Item.objects.filter(user=req.user).order_by('-id')
+def get_todos(request):
+    if request.method == 'GET':
+        todos = Todo_Item.objects.filter(user=request.user)
         serializer = TodoSerializer(todos,many=True)
         return JsonResponse({"todos":serializer.data})
     else:
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
 @login_required
-@api_view(['put'])
 def update_todo(request, todo_id): 
     try:
         todo = Todo_Item.objects.get(id=todo_id)
+        if todo.user != request.user:
+            return JsonResponse({"error": "Permission denied"}, status=403)
     except Todo_Item.DoesNotExist:
         return JsonResponse({"error": "Todo not found"}, status=404)
         
     if request.method == 'PUT':
-        serializer = TodoSerializer(todo, data=request.data)
+        data = JSONParser().parse(request)
+        serializer = TodoSerializer(todo, data=data)
         if serializer.is_valid():
             serializer.save()
-            return JsonResponse("Todo Updated", safe=False)
+            return JsonResponse({"Todo Updated":serializer.data}, safe=False)
         else:
             return JsonResponse("An error occurred", safe=False)
     else:
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
 @login_required
+@api_view(['get'])
 def get_todo(req, todo_id):
     if(req.method == "GET"):
         try:
@@ -86,6 +89,8 @@ def delete_todo(req, todo_id):
     if(req.method == "POST"):
         try:
             todo = Todo_Item.objects.get(id=todo_id)
+            if todo.user != req.user:
+                return JsonResponse({"error": "Permission denied"}, status=403)
         except Todo_Item.DoesNotExist:
             return JsonResponse({"error": "Todo not found"}, status=404)
         todo.delete()
