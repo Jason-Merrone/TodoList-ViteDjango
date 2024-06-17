@@ -4,9 +4,12 @@ import json
 import os
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.forms.models import model_to_dict
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework.parsers import JSONParser
 
 from .models import Todo_Item
+from .serializers import TodoSerializer
 
 # Load manifest when server launches
 MANIFEST = {}
@@ -29,26 +32,13 @@ def index(req):
 @login_required
 def create_todo(req):
     if req.method == 'POST':
-        user = req.user
-        content = req.POST.get('content')
-        due_date = req.POST.get('due_date')
+        data = JSONParser().parse(req)
+        serializer = TodoSerializer(data=data)
             
-        if(due_date):
-            from datetime import datetime
-            try:
-                due_date = datetime.strptime(due_date, '%Y-%m-%d').date()
-            except ValueError:
-                return render(req, 'core/create_todo.html', {'error': 'Invalid date format. Use YYYY-MM-DD.'})
-                
-        new_todo = Todo_Item.objects.create(
-            user = user,
-            content = content,
-            due_date=due_date
-        )
-            
-        new_todo.save()
+        if serializer.is_valid():
+            serializer.save(user=req.user)
+            return JsonResponse({"todo created ":serializer.data}, status=201)
         
-        return JsonResponse({"message": "Todo created successfully"}, status=201)
     else:
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
@@ -56,48 +46,49 @@ def create_todo(req):
 def get_todos(req):
     if req.method == 'GET':
         todos = Todo_Item.objects.filter(user=req.user).order_by('-id')
-        todos_data = [
-            {
-                "id": todo.id,
-                "content": todo.content,
-                "due_date": todo.due_date
-            } for todo in todos
-        ]
-        return JsonResponse({"Todos": todos_data})
+        serializer = TodoSerializer(todos,many=True)
+        return JsonResponse({"todos":serializer.data})
     else:
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
 @login_required
-def update_todo(req, todo_id): 
+@api_view(['put'])
+def update_todo(request, todo_id): 
     try:
         todo = Todo_Item.objects.get(id=todo_id)
     except Todo_Item.DoesNotExist:
         return JsonResponse({"error": "Todo not found"}, status=404)
         
-    todo_content = req.POST.get('content')
-    if todo_content is not None:
-        todo.content = todo_content
-            
-    todo_due_date = req.POST.get('due_date')
-    if todo_due_date is not None:
-        todo.due_date = todo_due_date
-        
-    todo.save()
-        
-    return JsonResponse("Todo Updated", safe=False)
+    if request.method == 'PUT':
+        serializer = TodoSerializer(todo, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse("Todo Updated", safe=False)
+        else:
+            return JsonResponse("An error occurred", safe=False)
+    else:
+        return JsonResponse({"error": "Method not allowed"}, status=405)
 
 @login_required
-def get_todo(req, todo_id):   
-    try:
-        todo = model_to_dict( Todo_Item.objects.get(id=todo_id) )
-    except Todo_Item.DoesNotExist:
-        return JsonResponse({"error": "Todo not found"}, status=404)
-    return JsonResponse({"Todo": todo})
+def get_todo(req, todo_id):
+    if(req.method == "GET"):
+        try:
+            todo = Todo_Item.objects.get(id=todo_id)
+            serializer = TodoSerializer(todo)
+        except Todo_Item.DoesNotExist:
+            return JsonResponse({"error": "Todo not found"}, status=404)
+        return JsonResponse({"todo":serializer.data})
+    else:
+        return JsonResponse({"error": "Method not allowed"}, status=405)
 
+@login_required
 def delete_todo(req, todo_id):
-    try:
-        todo = Todo_Item.objects.get(id=todo_id)
-    except Todo_Item.DoesNotExist:
-        return JsonResponse({"error": "Todo not found"}, status=404)
-    todo.delete()
-    return JsonResponse({"message": "Todo deleted"})
+    if(req.method == "POST"):
+        try:
+            todo = Todo_Item.objects.get(id=todo_id)
+        except Todo_Item.DoesNotExist:
+            return JsonResponse({"error": "Todo not found"}, status=404)
+        todo.delete()
+        return JsonResponse({"message": "Todo deleted"})
+    else:
+        return JsonResponse({"error": "Method not allowed"}, status=405)
