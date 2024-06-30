@@ -15,7 +15,6 @@ class DeleteTodoTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'message': 'Todo deleted'})
 
-        # Check if the todo item was actually deleted
         with self.assertRaises(Todo_Item.DoesNotExist):
             Todo_Item.objects.get(id=self.todo.id)
 

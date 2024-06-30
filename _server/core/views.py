@@ -100,3 +100,8 @@ def delete_todo(req, todo_id):
         return JsonResponse({"message": "Todo deleted"})
     else:
         return JsonResponse({"error": "Method not allowed"}, status=405)
+    
+@login_required
+def hello_world(req):
+    if(req.method == "GET"):
+        return JsonResponse({"content": "Hello, World!"})
